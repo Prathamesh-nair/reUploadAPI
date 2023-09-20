@@ -1,0 +1,6 @@
+# dot env files
+.env
+*.log
+
+# Node_module Files
+node_modules/
