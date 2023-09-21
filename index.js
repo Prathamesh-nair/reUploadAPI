@@ -7,7 +7,7 @@ const logger = require("./logger");
 const app = express();
 const bodyParser = require("body-parser");
 const client = require("./connection");
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
@@ -67,7 +67,7 @@ app.post("/application/:id", (req, res) => {
         res.status(500).json({
           message: `There is some technical issue. Please try again.`,
         });
-        console.log(error);
+        // console.log(error);
         // logger.error(``)
       }
     }

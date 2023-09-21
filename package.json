@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prodStart": "node index.js",
+    "start": "node index.js",
     "devStart": "nodemon index.js"
   },
   "keywords": [],
