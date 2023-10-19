@@ -7,6 +7,8 @@ const logger = require("./logger");
 const app = express();
 const bodyParser = require("body-parser");
 const client = require("./connection");
+const { sequelize } = require("./sequelize");
+
 const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
@@ -19,11 +21,11 @@ app.use((req, res, next) => {
     req.bearerToken = bearerToken;
     if (bearerToken.agentData.role !== "38") {
       next();
-    } else {
-      res.status(401).json({ message: `User not Authenticated.` });
     }
   } else {
-    res.status(401).json({ message: `Token Not Found.` });
+    res
+      .status(401)
+      .json({ message: `Token Not Found. Kindly provide the Bearer Token` });
   }
 });
 
@@ -66,6 +68,57 @@ app.post("/application/:id", (req, res) => {
       }
     }
   );
+});
+
+app.get("/checkApplication/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const query1 = `select ui.app_number, s.segment , s.exchange , s.status, s.remarks  from segment s
+inner join user_id ui on ui.app_number  = s.app_number where ui.user_id ='${id}' and s.segment = 'C';	`;
+
+    const query2 = `select cd.app_number , cd.status , cd.last_update_ts, cd.error_message from cdsl_app cd 
+inner join user_id ui on ui.app_number = cd.app_number where ui.user_id  = '${id}';`;
+    const query3 = `
+      select ui.app_number, ui.user_id,right(ck.status,2) as "status",
+CASE
+WHEN right(ck.status,2) = '01' then 'SUBMITTED'
+WHEN right(ck.status,2) = '02' then 'KRA_VERIFIED'
+WHEN right(ck.status,2) = '03' then 'HOLD'
+WHEN right(ck.status,2) = '04' then 'REJECTED'
+WHEN right(ck.status,2) = '05' then 'NOT_AVAILABLE'
+WHEN right(ck.status,2) = '06' then 'DEACTIVATED'
+WHEN right(ck.status,2) = '07' then 'KRA_VALIDATED'
+WHEN right(ck.status,2) = '11' then 'EXISTING_KYC_SUBMITTED'
+WHEN right(ck.status,2) = '12' then 'EXISTING_KYC_VERIFIED'
+WHEN right(ck.status,2) = '13' then 'EXISTING_KYC_HOLD'
+WHEN right(ck.status,2) = '14' then 'EXISTING_KYC_REJECTED'
+WHEN right(ck.status,2) = '22' then 'KYC_REGISTERED_WITH_CVLMF'
+WHEN right(ck.status,2) = '88' then 'NOT_CHECKED_WITH_MULTIPLE_KRA'
+END AS "Current_status"
+from user_id ui
+inner join pan pn on pn.app_number = ui.app_number
+inner join cvlkra ck on ck.pan = pn.pan
+where  ui.user_id = '${id}';`;
+
+    const [result1, error1] = await sequelize.query(query1);
+    const [result2, error2] = await sequelize.query(query2);
+    const [result3, error3] = await sequelize.query(query3);
+
+    if (result1 && result2 && result3) {
+      res.status(200).json({
+        UCCDate: result1,
+        CDSLData: result2,
+        KRA_Data: result3,
+      });
+    } else {
+      res
+        .status(500)
+        .json({ UCCDate: error1, CDSLData: error2, KRA_Data: error3 });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 client.connect();
