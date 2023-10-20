@@ -13,6 +13,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
+//Middleware for Bearer Token authentication
+
 app.use((req, res, next) => {
   const headerToken = req.headers["authorization"];
   if (typeof headerToken !== "undefined") {
@@ -29,6 +31,7 @@ app.use((req, res, next) => {
   }
 });
 
+//Get request API call to check the application status in Scrutiny Table(using application number as Parameter ID)
 app.get("/application/:id", (req, res) => {
   client.query(
     `select * from scrutiny where app_number ='${req.params.id}'`,
@@ -43,6 +46,7 @@ app.get("/application/:id", (req, res) => {
   client.end;
 });
 
+//Post request API call to update the application status in Scrutiny Table(using application number as Parameter ID)
 app.post("/application/:id", (req, res) => {
   const { requestID } = req.body;
 
@@ -70,6 +74,7 @@ app.post("/application/:id", (req, res) => {
   );
 });
 
+//Get request API call to check the application status in Fulfillment Tables and aadhaar PAN seeding(using Client Code as Parameter ID)
 app.get("/checkApplication/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -101,20 +106,29 @@ inner join pan pn on pn.app_number = ui.app_number
 inner join cvlkra ck on ck.pan = pn.pan
 where  ui.user_id = '${id}';`;
 
+    const query4 = `select user_id.app_number, pan.pan, pan.is_aadhaar_pan_seeded  from user_id
+inner join pan on pan.app_number = user_id.app_number 
+where user_id.user_id  = '${id}';`;
+
     const [result1, error1] = await sequelize.query(query1);
     const [result2, error2] = await sequelize.query(query2);
     const [result3, error3] = await sequelize.query(query3);
+    const [result4, error4] = await sequelize.query(query4);
 
-    if (result1 && result2 && result3) {
+    if (result1 && result2 && result3 && result4) {
       res.status(200).json({
         UCCDate: result1,
         CDSLData: result2,
         KRA_Data: result3,
+        PAN_seeding_Data: result4,
       });
     } else {
-      res
-        .status(500)
-        .json({ UCCDate: error1, CDSLData: error2, KRA_Data: error3 });
+      res.status(500).json({
+        UCCDate: error1,
+        CDSLData: error2,
+        KRA_Data: error3,
+        PAN_seeding_Data: error4,
+      });
     }
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
